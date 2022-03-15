@@ -88,7 +88,12 @@ CountyCommutes$Pct <- format(round(CountyCommutes$Pct,2), nsmall=2)
 CountyCommutes <- CountyCommutes[-c(9),] #LA County (only 2%) removed, otherwise the map is borderline unreadable. Will mention in final analysis
 CountyCommutes$Pct <- as.numeric(CountyCommutes$Pct)
 
-HighestCounty <- CountyCommutes %>%
+TractGeo <- st_union(Over90)
+st_agr(CountyCommutes) = "constant"
+st_agr(TractGeo) = "constant"
+CountyCommutesCrop <- st_intersection(CountyCommutes, TractGeo)
+
+HighestCounty <- CountyCommutesCrop %>%
   filter(County == "Contra Costa")
 
 #Mapping
@@ -113,9 +118,10 @@ ggplot(Over90Total, aes(NinetyPlusPCT)) +
   labs(title = "Bay Area Super Commuters By Census Tract, 2009 vs. 2019", x = "Grouping of Tracts by Percentage of Residents with Commute Times over 90 Min. (Orange = 2009, Red = 2019)", y = "Count") +
   theme(line = element_blank(), plot.title = element_text(hjust = 0.5))
 
-palette1 <- c("#fcffa4", "#f9e46e", "#fbbe22", "#f3771a", "#d34743", "#63156e") #Custom color palette since inferno's scale doesn't work well with the map below
+palette1 <- c("#fcffa4", "#f9e46e", "#fbbe22", "#f3771a", "#d34743", "#962765") #Custom color palette since inferno's scale doesn't work well with the map below
 
-tm_shape(CountyCommutes) +
+tmap_options(check.and.fix = T)
+tm_shape(CountyCommutesCrop) +
   tm_fill("Pct", palette = palette1, style = "fixed", breaks = c(0,2,5,10,15,25,50)) +
   tm_basemap(server = "Esri.WorldGrayCanvas") +
   tm_borders(col = "gray5", lwd = 0.3) +
@@ -123,7 +129,7 @@ tm_shape(CountyCommutes) +
   tm_shape(CountyCommutes) +
   tm_text("Pct", ymod = -1) +
   tm_shape(HighestCounty) +
-  tm_borders(col = "gray5", lwd = 3)
+  tm_borders(col = "#63156e", lwd = 3)
 
 ggplot(CountyCommutes, aes(x = reorder(County, -Pct), y = Pct)) + 
   geom_col(fill="#ff923f", alpha = 1, color = "gray5", lwd = 0.5) + 
