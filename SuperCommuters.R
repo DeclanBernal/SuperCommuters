@@ -82,7 +82,7 @@ MHData <- TravelTime %>%
          FrFiveto59 = B08303_011E,
          Sixtyto89 = B08303_012E,
          NinetyPlus = B08303_013E) %>%
-  mutate(">5" = (Under5/Total)*100,
+  mutate("<5" = (Under5/Total)*100,
          "05-09" = (Fiveto9/Total)*100,
          "10-14" = (Tento14/Total)*100,
          "15-19" = (Fifteento19/Total)*100,
