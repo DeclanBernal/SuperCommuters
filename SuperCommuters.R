@@ -85,29 +85,61 @@ CountyCommutes <- CountyCommutes %>%
 CountyCommutes <- st_transform(CountyCommutes, crs = 2227)
 CountyCommutes$County <- gsub(" County, CA","", CountyCommutes$County)
 CountyCommutes$Pct <- format(round(CountyCommutes$Pct,2), nsmall=2)
-CountyCommutes <- CountyCommutes[-c(9),] #LA County (only 2%) removed, otherwise the map is borderline unreadable. Will mention in final analysis
+CountyCommutes <- CountyCommutes[-c(9),] #LA County (only 2%) removed, otherwise the map is borderline unreadable (mentioned in final analysis)
 CountyCommutes$Pct <- as.numeric(CountyCommutes$Pct)
 
+MHCommutes <- st_read("polygon_2019mh.shp")
+sum(MHCommutes$s000)
+MHCommutes <- MHCommutes %>%
+  dplyr::select(1,2,3,14) %>%
+  rename(ID = id,
+         County = label,
+         Number = s000) %>%
+  mutate(Pct = (Number/4745)*100)
+MHCommutes <- st_transform(MHCommutes, crs = 2227)
+MHCommutes$County <- gsub(" County, CA","", MHCommutes$County)
+MHCommutes$Pct <- format(round(MHCommutes$Pct,2), nsmall=2)
+MHCommutes <- MHCommutes[-c(10),] #Again, removing LA County (1.7%)
+MHCommutes$Pct <- as.numeric(MHCommutes$Pct)
+
 TractGeo <- st_union(Over90)
-st_agr(CountyCommutes) = "constant"
-st_agr(TractGeo) = "constant"
 CountyCommutesCrop <- st_intersection(CountyCommutes, TractGeo)
 
 HighestCounty <- CountyCommutesCrop %>%
   filter(County == "Contra Costa")
 
+MHCommutesCrop <- st_intersection(MHCommutes, TractGeo)
+
+options(tigris_use_cache = TRUE)
+CAPlaces <- places(state = 06)
+CAPlaces <- st_transform(CAPlaces, crs = 2227)
+KeyPlaces <- filter(CAPlaces, NAME == "San Jose" | NAME == "San Francisco" | NAME == "Santa Cruz" | NAME == "Merced" | 
+                      NAME == "Modesto" | NAME == "Stockton" | NAME == "Sacramento" | NAME == "Vallejo" | NAME == "Santa Rosa" | 
+                      NAME == "Gilroy" | NAME == "Vacaville" | NAME == "Berkeley" | NAME == "San Mateo")
+MH <- filter(CAPlaces, NAME == "Mountain House")
+BayAreaPlaces <- KeyPlaces %>%
+  dplyr::select(4, 5, 17)
+MountainHouse <- MH %>%
+  dplyr::select(4, 5, 17)
+rm(CAPlaces, KeyPlaces, MH)
+
 #Mapping
 tmap_mode("view")
 tm_shape(Over90Old) +
-  tm_fill("NinetyPlusPCT", palette = "-inferno", style = "cont", showNA = F, popup.vars = c("% Super Commuters = "="NinetyPlusPCT")) +
-  tm_borders(col = "gray5", lwd = 0.3) +
+  tm_fill("NinetyPlusPCT", palette = "-inferno", alpha = 0.9, style = "cont", showNA = F, popup.vars = c("% Super Commuters = "="NinetyPlusPCT")) +
+  tm_borders(col = "gray5", lwd = 0.3, alpha = 0.5) +
+  tm_basemap(server = "CartoDB.PositronNoLabels") +
+  tm_shape(BayAreaPlaces) +
+  tm_text(text = "NAME", size = 1, auto.placement = FALSE, ymod = 1, shadow = TRUE, bg.color = "white", bg.alpha = 0.25) +
   tm_shape(LCO_Buffer) +
   tm_fill(col = "white", alpha = 0.75)
 
 tm_shape(Over90) +
-  tm_fill("NinetyPlusPCT", palette = "-inferno", style = "cont", showNA = F, popup.vars = c("% Super Commuters = "="NinetyPlusPCT")) +
-  tm_basemap(server = "Esri.WorldGrayCanvas") +
+  tm_fill("NinetyPlusPCT", palette = "-inferno", alpha = 0.9, style = "cont", showNA = F, popup.vars = c("% Super Commuters = "="NinetyPlusPCT")) +
   tm_borders(col = "gray5", lwd = 0.3, alpha = 0.5) +
+  tm_basemap(server = "CartoDB.PositronNoLabels") +
+  tm_shape(BayAreaPlaces) +
+  tm_text(text = "NAME", size = 1, auto.placement = FALSE, ymod = 1, shadow = TRUE, bg.color = "white", bg.alpha = 0.25) +
   tm_shape(LC_Buffer) +
   tm_fill(col = "white", alpha = 0.75)
 
@@ -122,19 +154,43 @@ palette1 <- c("#fcffa4", "#f9e46e", "#fbbe22", "#f3771a", "#d34743", "#962765") 
 
 tmap_options(check.and.fix = T)
 tm_shape(CountyCommutesCrop) +
-  tm_fill("Pct", palette = palette1, style = "fixed", breaks = c(0,2,5,10,15,25,50)) +
-  tm_basemap(server = "Esri.WorldGrayCanvas") +
+  tm_fill("Pct", palette = palette1, alpha = 0.85, style = "fixed", breaks = c(0,2,5,10,15,25,50)) +
   tm_borders(col = "gray5", lwd = 0.3) +
   tm_text("County", ymod = 1) +
+  tm_basemap(server = "CartoDB.PositronNoLabels") +
   tm_shape(CountyCommutes) +
   tm_text("Pct", ymod = -1) +
   tm_shape(HighestCounty) +
   tm_borders(col = "#63156e", lwd = 3)
 
 ggplot(CountyCommutes, aes(x = reorder(County, -Pct), y = Pct)) + 
-  geom_col(fill="#ff923f", alpha = 1, color = "gray5", lwd = 0.5) + 
+  geom_col(fill = "#ff923f", alpha = 1, color = "gray5", lwd = 0.5) + 
   theme_classic() +
-  labs(x="County of Work Destination", y="Percentage", title="Place of Work for Contra Costa County Residents") + 
+  labs(x = "County of Work Destination", y = "Percentage", title = "County of Place of Work for Contra Costa  Residents") + 
+  scale_y_continuous(expand = c(0,0), limits = c(0,45)) +
+  geom_text(aes(label = Pct), vjust = -0.5) +
+  theme(line = element_blank(), plot.title = element_text(hjust = 0.5))
+
+tm_shape(MountainHouse) +
+  tm_borders(col = "gray5", lwd = 2, alpha = 0.5) +
+  tm_basemap(server = "CartoDB.Positron")
+
+tm_shape(MHCommutesCrop) +
+  tm_fill("Pct", palette = palette1, alpha = 0.85, style = "fixed", breaks = c(0,2,5,10,15,25,50)) +
+  tm_borders(col = "gray5", lwd = 0.3) +
+  tm_text("County", ymod = 1) +
+  tm_basemap(server = "CartoDB.PositronNoLabels") +
+  tm_shape(MHCommutes) +
+  tm_text("Pct", ymod = -1) +
+  tm_shape(MountainHouse) +
+  tm_fill(col = "white") +
+  tm_borders(col = "#63156e", lwd = 3) +
+  tm_text("NAME", ymod = -1.5)
+
+ggplot(MHCommutes, aes(x = reorder(County, -Pct), y = Pct)) + 
+  geom_col(fill = "#ff923f", alpha = 1, color = "gray5", lwd = 0.5) + 
+  theme_classic() +
+  labs(x = "County of Work Destination", y = "Percentage", title = "County of Place of Work for Mountain House Residents") + 
   scale_y_continuous(expand = c(0,0), limits = c(0,45)) +
   geom_text(aes(label = Pct), vjust = -0.5) +
   theme(line = element_blank(), plot.title = element_text(hjust = 0.5))
